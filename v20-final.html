@@ -1998,3 +1998,590 @@ $("#fileInput").onchange=e=>{
   const files=[...e.target.files];const list=$("#fileList");list.innerHTML="";
   files.forEach(f=>{const url=URL.createObjectURL(f);const row=document.createElement("div");row.className="file";
     const title=document.createElement("b");title.textContent=f.name;const meta=document.createElement("small");meta.textContent=`${(f.size/1024/1024).toFixed(2)} MB · 이 기기에서 열기/다운로드 가능`;
+    const actions=document.createElement("div");actions.className="button-row";const open=document.createElement("a");open.href=url;open.target="_blank";open.textContent="열기";
+    const down=document.createElement("a");down.href=url;down.download=f.name;down.textContent="다운로드";actions.append(open,down);row.append(title,meta,actions);list.appendChild(row);
+  });
+}
+$("#saveGoal").onclick=()=>{localStorage.setItem("r12goal",$("#todayGoal").value);alert("오늘 목표를 저장했습니다.");}
+$("#todayGoal").value=localStorage.getItem("r12goal")||"";
+$("#resetDaily").onclick=()=>{localStorage.removeItem("r12checks");renderRoutines();}
+$$("[data-scroll]").forEach(b=>b.onclick=()=>{document.querySelector(b.dataset.scroll).scrollIntoView({behavior:"smooth"});$("#drawer").classList.remove("open")});
+$("#menuBtn").onclick=()=>$("#drawer").classList.add("open");$("#closeDrawer").onclick=()=>$("#drawer").classList.remove("open");
+let scene=0;const scenes=$$(".scene");const timer=setInterval(()=>{scenes[scene].classList.remove("active");scene++;if(scene>=scenes.length){clearInterval(timer);$("#splash").classList.add("hide")}else scenes[scene].classList.add("active")},1650);
+$("#skipSplash").onclick=()=>{$("#splash").classList.add("hide");}
+renderRoutines();renderCustomers();
+
+// ===== Business card editor / export (88 x 54 ratio) =====
+const cardFields = ["cardName","cardNameEn","cardRole","cardEmail","cardPhone","cardCall","cardWeb","cardAddress","cardHq"];
+const ownerLogo = new Image(); ownerLogo.src="assets/owner-card-logo.png";
+const r12Logo = new Image(); r12Logo.src="assets/r12-card-logo.png";
+function drawOwnerMark(ctx,x,y,w,h){
+  if(ownerLogo.complete&&ownerLogo.naturalWidth){ctx.drawImage(ownerLogo,x,y,w,h);return}
+  ctx.save();ctx.translate(x+w/2,y+h/2);const r=Math.min(w,h)*.34;const g=ctx.createLinearGradient(-r,-r,r,r);g.addColorStop(0,"#fff");g.addColorStop(.45,"#7f8a97");g.addColorStop(1,"#f4f6f8");ctx.strokeStyle=g;ctx.lineWidth=Math.max(8,w*.045);ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.stroke();ctx.fillStyle="#eef2f6";ctx.font=`italic 900 ${Math.round(r*1.25)}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText("N",0,4);ctx.restore()
+}
+function drawR12Mark(ctx,x,y,w,h){
+  if(r12Logo.complete&&r12Logo.naturalWidth){ctx.drawImage(r12Logo,x,y,w,h);return}
+  ctx.save();ctx.textAlign="center";ctx.fillStyle="#dce3eb";ctx.font=`700 ${Math.round(h*.48)}px Arial`;ctx.fillText("R12",x+w/2,y+h*.52);ctx.font=`${Math.round(h*.16)}px Arial`;ctx.letterSpacing="4px";ctx.fillText("REVERSE 12",x+w/2,y+h*.78);ctx.restore()
+}
+
+function roundedRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+function fitText(ctx,text,maxWidth,startSize,minSize=15){
+  let s=startSize;ctx.font=`${s}px Arial, sans-serif`;
+  while(s>minSize && ctx.measureText(text).width>maxWidth){s-=1;ctx.font=`${s}px Arial, sans-serif`;}
+  return s;
+}
+function cardData(){
+  return Object.fromEntries(cardFields.map(id=>[id,document.getElementById(id).value.trim()]));
+}
+function splitLines(ctx,text,maxWidth){
+  const words=text.split(/\s+/); const lines=[]; let line="";
+  words.forEach(w=>{const test=line?line+" "+w:w;if(ctx.measureText(test).width>maxWidth && line){lines.push(line);line=w}else line=test});
+  if(line)lines.push(line); return lines;
+}
+function drawWave(ctx){
+  ctx.save();ctx.strokeStyle="rgba(210,225,240,.18)";ctx.lineWidth=1;
+  for(let i=0;i<10;i++){ctx.beginPath();ctx.moveTo(-20,380+i*8);ctx.bezierCurveTo(210,250+i*3,490,555-i*6,900,245+i*5);ctx.stroke();}
+  ctx.restore();
+}
+function drawBusinessCards(){
+  const d=cardData();
+  const front=document.getElementById("cardFrontCanvas"), f=front.getContext("2d");
+  const back=document.getElementById("cardBackCanvas"), b=back.getContext("2d");
+  [f,b].forEach(ctx=>{ctx.clearRect(0,0,880,540);const g=ctx.createLinearGradient(0,0,880,540);g.addColorStop(0,"#07111f");g.addColorStop(.55,"#0a1726");g.addColorStop(1,"#06101a");ctx.fillStyle=g;roundedRect(ctx,0,0,880,540,34);ctx.fill();drawWave(ctx);});
+
+  // Front
+  drawOwnerMark(f,70,80,230,230);
+  f.strokeStyle="rgba(230,236,244,.65)";f.lineWidth=2;f.beginPath();f.moveTo(330,72);f.lineTo(330,465);f.stroke();
+  f.fillStyle="#f7f8fa";f.font="700 42px Arial, sans-serif";f.fillText(d.cardName,380,115);
+  f.fillStyle="#b9c4d1";f.font="24px Arial, sans-serif";f.fillText(d.cardRole,380,154);
+  const rows=[
+    ["✉",d.cardEmail],["☎",d.cardPhone],["◉","주문 콜센터 "+d.cardCall],["◎",d.cardWeb]
+  ];
+  let y=225; rows.forEach(([ic,t])=>{f.fillStyle="#dce3eb";f.font="25px Arial";f.fillText(ic,380,y);f.font="23px Arial";f.fillText(t,425,y);y+=55;});
+  f.fillStyle="#dce3eb";f.font="22px Arial";f.fillText("⌖",380,y);
+  f.font="20px Arial"; let lines=splitLines(f,d.cardAddress,410); lines.slice(0,2).forEach((ln,i)=>f.fillText(ln,425,y+i*28));
+  y+=70;f.fillStyle="#91a5bc";f.font="17px Arial";f.fillText("본사  "+d.cardHq,425,y);
+  drawR12Mark(f,720,400,120,85);
+
+  // Back
+  drawOwnerMark(b,310,55,260,260);
+  b.fillStyle="#dce3eb";b.textAlign="center";
+  b.font="24px Arial";b.fillText(d.cardRole,440,327);
+  b.font="34px Arial";b.fillText(d.cardNameEn,440,382);
+  b.strokeStyle="rgba(230,236,244,.55)";b.beginPath();b.moveTo(260,410);b.lineTo(620,410);b.stroke();
+  drawR12Mark(b,340,425,200,105);
+  b.textAlign="left";
+}
+ownerLogo.onload=drawBusinessCards;r12Logo.onload=drawBusinessCards;
+document.getElementById("applyCard").onclick=()=>{drawBusinessCards();localStorage.setItem("r12card",JSON.stringify(cardData()));};
+const savedCard=JSON.parse(localStorage.getItem("r12card")||"null");if(savedCard){cardFields.forEach(id=>{if(savedCard[id])document.getElementById(id).value=savedCard[id]});}
+function downloadCanvas(id,name){drawBusinessCards();const a=document.createElement("a");a.download=name;a.href=document.getElementById(id).toDataURL("image/png");a.click();}
+document.getElementById("exportFront").onclick=()=>downloadCanvas("cardFrontCanvas","REVERSE12_OWNER_CARD_FRONT_88x54.png");
+document.getElementById("exportBack").onclick=()=>downloadCanvas("cardBackCanvas","REVERSE12_OWNER_CARD_BACK_88x54.png");
+function canvasFile(id,name){
+  return new Promise((resolve,reject)=>document.getElementById(id).toBlob(blob=>blob?resolve(new File([blob],name,{type:"image/png"})):reject(new Error("명함 이미지 생성 실패")),"image/png"));
+}
+function cardShareText(){
+  const d=cardData();
+  return `${d.cardName} ${d.cardRole}\n${d.cardPhone}\n${d.cardEmail}\n${d.cardWeb}`;
+}
+document.getElementById("shareCardImages").onclick=async()=>{
+  drawBusinessCards();
+  const status=document.getElementById("cardShareStatus");
+  try{
+    const files=[
+      await canvasFile("cardFrontCanvas","REVERSE12_OWNER_CARD_FRONT_88x54.png"),
+      await canvasFile("cardBackCanvas","REVERSE12_OWNER_CARD_BACK_88x54.png")
+    ];
+    if(navigator.share&&navigator.canShare&&navigator.canShare({files})){
+      await navigator.share({title:"OWNER 디지털 명함",text:cardShareText(),files});
+      status.textContent="명함 앞·뒤 이미지를 공유했습니다.";
+    }else if(navigator.share){
+      await navigator.share({title:"OWNER 디지털 명함",text:cardShareText()});
+      downloadCanvas("cardFrontCanvas",files[0].name);downloadCanvas("cardBackCanvas",files[1].name);
+      status.textContent="이 기기는 이미지 첨부 공유를 지원하지 않아 연락처를 공유하고 명함 PNG를 저장했습니다.";
+    }else{
+      downloadCanvas("cardFrontCanvas",files[0].name);downloadCanvas("cardBackCanvas",files[1].name);
+      location.href=`sms:?body=${encodeURIComponent(cardShareText())}`;
+      status.textContent="명함 PNG를 저장했습니다. 문자 작성창에서 저장된 이미지를 첨부하세요.";
+    }
+  }catch(err){
+    if(err&&err.name==="AbortError")return;
+    status.textContent="공유하지 못했습니다. 앞면·뒷면 PNG 버튼으로 저장한 뒤 첨부해 주세요.";
+  }
+};
+document.getElementById("shareCardLink").onclick=async()=>{
+  const status=document.getElementById("cardShareStatus");
+  const isPublic=/^https?:$/.test(location.protocol)&&!/(localhost|127\.0\.0\.1)$/i.test(location.hostname);
+  if(!isPublic){status.textContent="현재는 작업 확인용 파일입니다. 공개 배포 후 이 버튼으로 누구에게나 명함 링크를 보낼 수 있습니다.";alert(status.textContent);return;}
+  const url=location.href.split("#")[0]+"#businessCard";
+  const payload={title:"OWNER 디지털 명함",text:cardShareText(),url};
+  if(navigator.share){try{await navigator.share(payload);status.textContent="명함 공개 링크 공유창을 열었습니다."}catch(err){if(err.name!=="AbortError")status.textContent="링크 공유를 취소했거나 지원되지 않습니다."}}
+  else{await navigator.clipboard.writeText(`${cardShareText()}\n${url}`);status.textContent="명함 링크를 복사했습니다.";alert(status.textContent)}
+};
+
+// ===== Customer greeting generator =====
+const weatherLines={
+ "맑고 화창함":"오늘처럼 맑고 화창한 날, 기분 좋은 일도 가득하시길 바랍니다.",
+ "비가 옴":"비 오는 날 길 미끄러우니 이동하실 때 조심하시고, 편안한 하루 보내세요.",
+ "눈이 옴":"눈이 내려 길이 미끄러울 수 있으니 따뜻하게 챙겨 입으시고 안전하게 이동하세요.",
+ "무더움":"오늘은 많이 덥습니다. 물 자주 챙겨 드시고 무리하지 않는 시원한 하루 보내세요.",
+ "추움":"오늘은 기온이 낮습니다. 따뜻하게 챙겨 입으시고 건강한 하루 보내세요.",
+ "바람이 강함":"바람이 강한 날입니다. 외출 시 안전에 유의하시고 편안한 하루 보내세요.",
+ "미세먼지가 많음":"공기 상태가 좋지 않은 날에는 외출 후 충분히 쉬시고 컨디션 관리 잘 하세요.",
+ "일교차가 큼":"일교차가 큰 날입니다. 겉옷 꼭 챙기시고 컨디션 관리 잘 하시길 바랍니다."
+};
+function greetingByPurpose(name,rel,purpose,weather,tone,season){
+  const who=name?`${name}님`:"고객님";
+  const seasonLines={봄:"새로운 시작이 피어나는 봄입니다.",여름:"활기찬 여름, 건강과 수분 관리 잘 챙기세요.",가을:"결실의 계절 가을, 좋은 성과가 함께하시길 바랍니다.",겨울:"따뜻한 마음이 더욱 소중한 겨울입니다."};
+  const w=`${seasonLines[season]||""} ${weatherLines[weather]||""}`.trim();
+  let core="";
+  if(purpose==="아침 인사") core=`${who}, 좋은 아침입니다. ${w}`;
+  else if(purpose==="상담 후 인사") core=`${who}, 오늘 상담 함께해 주셔서 감사합니다. 궁금하신 점은 언제든 편하게 말씀 주세요. ${w}`;
+  else if(purpose==="재구매 안내") core=`${who}, 사용 중 불편한 점은 없으셨는지 안부드립니다. 필요하신 제품이나 재구매 일정이 있으시면 편하게 알려주세요. ${w}`;
+  else if(purpose==="자료 전달") core=`${who}, 요청하신 자료 보내드립니다. 천천히 확인해 보시고 궁금한 부분은 편하게 연락 주세요. ${w}`;
+  else if(purpose==="약속 확인") core=`${who}, 예정된 일정 확인차 연락드립니다. 변동 사항이 있으시면 언제든 편하게 말씀 주세요. ${w}`;
+  else core=`${who}, 잘 지내고 계시죠? 문득 안부가 궁금해 연락드립니다. ${w}`;
+  if(tone==="짧고 세련되게") core=core.replace("문득 안부가 궁금해 연락드립니다. ","").replace("언제든 편하게 말씀 주세요. ","");
+  if(tone==="비즈니스형") core=`${who}, 안녕하세요. OWNER REVERSE 12입니다. ${core.replace(`${who},`,"").trim()}`;
+  if(rel==="VIP 고객") core=`${who}, 늘 감사드립니다. `+core.replace(`${who},`,"");
+  if(rel==="사업자 파트너") core=`${who}, 파트너님 안녕하세요. `+core.replace(`${who},`,"");
+  return core.trim()+"\n\nOWNER REVERSE 12\n본사 콜센터 1522-6852";
+}
+function updateWeatherExample(){document.getElementById("weatherExample").textContent=weatherLines[document.getElementById("greetWeather").value]||""}
+document.getElementById("greetWeather").onchange=updateWeatherExample;updateWeatherExample();
+document.getElementById("generateGreeting").onclick=()=>{
+  document.getElementById("greetingText").value=greetingByPurpose(
+    document.getElementById("greetName").value.trim(),
+    document.getElementById("greetRelation").value,
+    document.getElementById("greetPurpose").value,
+    document.getElementById("greetWeather").value,
+    document.getElementById("greetTone").value,
+    document.getElementById("greetSeason").value
+  );
+};
+document.getElementById("copyGreeting").onclick=async()=>{await navigator.clipboard.writeText(document.getElementById("greetingText").value);alert("인사말을 복사했습니다.");}
+document.getElementById("smsGreeting").onclick=()=>{const t=encodeURIComponent(document.getElementById("greetingText").value);location.href=`sms:?body=${t}`;}
+document.getElementById("shareGreeting").onclick=async()=>{const t=document.getElementById("greetingText").value;if(navigator.share){await navigator.share({title:"고객 인사말",text:t})}else{await navigator.clipboard.writeText(t);alert("공유 기능이 없는 환경이라 문구를 복사했습니다.");}}
+drawBusinessCards();
+
+// ===== Organization chart: pinch zoom / pan / wheel zoom =====
+const orgViewport=document.getElementById("orgViewport");
+const orgCanvas=document.getElementById("orgCanvas");
+const orgLines=document.getElementById("orgLines");
+let orgScale=1, orgX=0, orgY=0, orgDragging=false, lastX=0,lastY=0,lastDist=null;
+function applyOrgTransform(){
+  orgCanvas.style.transform=`translate(${orgX}px,${orgY}px) scale(${orgScale})`;
+  document.getElementById("zoomLabel").textContent=Math.round(orgScale*100)+"%";
+}
+function drawOrgLines(){
+  orgLines.innerHTML="";
+  const nodes=[...document.querySelectorAll(".org-node")];
+  const byId=Object.fromEntries(nodes.map(n=>[n.dataset.id,n]));
+  nodes.forEach(n=>{
+    const p=byId[n.dataset.parent]; if(!p)return;
+    const x1=parseFloat(p.style.left)+85,y1=parseFloat(p.style.top)+88;
+    const x2=parseFloat(n.style.left)+85,y2=parseFloat(n.style.top);
+    const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d",`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`);
+    path.setAttribute("fill","none");path.setAttribute("stroke","rgba(170,195,225,.45)");path.setAttribute("stroke-width","2");
+    orgLines.appendChild(path);
+  });
+}
+function clampScale(s){return Math.max(.45,Math.min(2.4,s));}
+document.getElementById("zoomIn").onclick=()=>{orgScale=clampScale(orgScale+.15);applyOrgTransform()};
+document.getElementById("zoomOut").onclick=()=>{orgScale=clampScale(orgScale-.15);applyOrgTransform()};
+document.getElementById("fitOrg").onclick=()=>{const w=orgViewport.clientWidth,h=orgViewport.clientHeight;orgScale=Math.min(w/1000,h/700)*.95;orgX=(w-1000*orgScale)/2;orgY=(h-700*orgScale)/2;applyOrgTransform()};
+orgViewport.addEventListener("wheel",e=>{e.preventDefault();const old=orgScale;orgScale=clampScale(orgScale*(e.deltaY<0?1.08:.92));const r=orgViewport.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;orgX=mx-(mx-orgX)*(orgScale/old);orgY=my-(my-orgY)*(orgScale/old);applyOrgTransform()},{passive:false});
+orgViewport.addEventListener("pointerdown",e=>{orgDragging=true;lastX=e.clientX;lastY=e.clientY;orgViewport.setPointerCapture(e.pointerId)});
+orgViewport.addEventListener("pointermove",e=>{if(!orgDragging)return;orgX+=e.clientX-lastX;orgY+=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;applyOrgTransform()});
+orgViewport.addEventListener("pointerup",()=>orgDragging=false);
+orgViewport.addEventListener("pointercancel",()=>orgDragging=false);
+
+// Native touch pinch
+orgViewport.addEventListener("touchmove",e=>{
+  if(e.touches.length===2){
+    e.preventDefault();
+    const a=e.touches[0],b=e.touches[1];
+    const dist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+    if(lastDist){orgScale=clampScale(orgScale*(dist/lastDist));applyOrgTransform()}
+    lastDist=dist;
+  }
+},{passive:false});
+orgViewport.addEventListener("touchend",()=>lastDist=null);
+
+document.querySelectorAll(".org-node").forEach(n=>n.onclick=e=>{
+  e.stopPropagation();document.querySelectorAll(".org-node").forEach(x=>x.classList.remove("selected"));n.classList.add("selected");
+});
+document.getElementById("addOrgMember").onclick=()=>{
+  alert("보상플랜 구조를 받은 뒤 회원추가 → 추천인/후원인 선택 → 등급/실적 → 자동 배치까지 연결합니다.");
+};
+document.getElementById("toggleSponsor").onclick=()=>{
+  document.querySelectorAll(".org-node small").forEach(x=>x.style.display=x.style.display==="none"?"block":"none");
+};
+document.getElementById("orgSearch").oninput=e=>{
+  const q=e.target.value.trim();
+  document.querySelectorAll(".org-node").forEach(n=>{
+    n.style.opacity=!q||n.textContent.includes(q)?"1":".18";
+  });
+};
+drawOrgLines(); setTimeout(()=>document.getElementById("fitOrg").click(),100);
+
+// ===== Subscription demo =====
+const TRIAL_LIMIT=30;
+function updateUsageMeter(){
+  const n=Number(localStorage.getItem("r12Usage")||0);
+  const c=document.getElementById("usageCount"),b=document.getElementById("usageBar");
+  if(c)c.textContent=n;if(b)b.style.width=Math.min(100,(n/TRIAL_LIMIT)*100)+"%";
+}
+function hasGooglePlayBilling(){
+  return !!(window.AndroidBilling && typeof window.AndroidBilling.subscribe === "function");
+}
+function openGooglePlaySubscription(basePlanId){
+  if(hasGooglePlayBilling()){
+    window.AndroidBilling.subscribe(basePlanId);
+  }else{
+    alert("Google Play 정기결제는 REVERSE 12 Android 앱(APK/Play Store 설치본)에서 실행됩니다. 웹/Termux 미리보기에서는 결제 화면을 열 수 없습니다.");
+  }
+}
+function startTrial(){
+  // Google Play Console의 monthly 기본 요금제 + trial10(10일 무료체험) 오퍼를 우선 선택합니다.
+  openGooglePlaySubscription("monthly");
+}
+document.getElementById("startTrial").onclick=startTrial;
+document.getElementById("monthlyPlan").onclick=()=>openGooglePlaySubscription("monthly");
+document.getElementById("annualPlan").onclick=()=>openGooglePlaySubscription("annual");
+
+window.onGooglePlayBillingStatus = function(status, message){
+  const text = message || status;
+  if(status === "PURCHASED" || status === "RESTORED"){
+    localStorage.setItem("r12Premium","true");
+    alert("Google Play 구독이 확인되었습니다. 프리미엄 기능을 사용할 수 있습니다.");
+  } else if(status === "PENDING"){
+    alert("Google Play 결제가 처리 중입니다. 결제가 완료되면 자동으로 활성화됩니다.");
+  } else if(status === "CANCELLED"){
+    alert("결제가 취소되었습니다.");
+  } else if(status === "ERROR"){
+    alert("Google Play 결제 오류: " + text);
+  }
+};
+updateUsageMeter();
+
+document.querySelectorAll(".copy-address").forEach(btn=>{
+  btn.addEventListener("click",async()=>{
+    const address=btn.dataset.address||"";
+    try{
+      await navigator.clipboard.writeText(address);
+      alert("주소를 복사했습니다.\n"+address);
+    }catch(e){
+      prompt("주소를 복사하세요.",address);
+    }
+  });
+});
+
+// ===== CRM Checklist =====
+const crmChecklistItems = [
+  {title:"신규 고객 등록", desc:"새로운 고객 이름, 연락처, 관심 제품을 등록", target:3, unit:"명", period:"오늘"},
+  {title:"관심 고객 분류", desc:"관심도 A/B/C와 상담단계 분류", target:5, unit:"명", period:"오늘"},
+  {title:"후속 연락하기", desc:"이전 상담 고객에게 안부·재연락 진행", target:5, unit:"명", period:"오늘"},
+  {title:"상담 일정 잡기", desc:"상담, 체험, 미팅 일정 확정", target:2, unit:"건", period:"오늘"},
+  {title:"샘플링/체험 안내", desc:"신규 샘플링 또는 체험 대상자 관리", target:2, unit:"명", period:"이번 주"},
+  {title:"사업 소개하기", desc:"제품/사업/기회 소개 진행", target:2, unit:"명", period:"오늘"},
+  {title:"교육자료 전달", desc:"PPT, PDF, 링크, 동영상 자료 발송", target:2, unit:"건", period:"오늘"},
+  {title:"주문서/회원등록서 관리", desc:"주문서·회원가입서·변경신청서 체크", target:2, unit:"건", period:"오늘"},
+  {title:"재구매 고객 관리", desc:"재구매 예상 고객, 사용 후기, 만족도 확인", target:3, unit:"명", period:"이번 주"},
+  {title:"VIP·생일 고객 관리", desc:"생일, 기념일, VIP 고객 인사말 발송", target:1, unit:"건", period:"오늘"},
+  {title:"상담 메모 기록", desc:"통화/채팅/미팅 후 메모 및 다음 액션 저장", target:5, unit:"건", period:"오늘"},
+  {title:"스폰서와 상담하기", desc:"매일 1회 이상 스폰서와 진행 상황 점검", target:1, unit:"회", period:"오늘"}
+];
+function renderCrmChecklist(){
+  const saved = JSON.parse(localStorage.getItem("r12crmChecks") || "{}");
+  const wrap = document.getElementById("crmChecklist");
+  if(!wrap) return;
+  wrap.innerHTML = crmChecklistItems.map((item, i) => {
+    const value = saved[i] || 0;
+    return `<div class="crm-item">
+      <div class="crm-text">
+        <b>${i+1}. ${item.title}</b>
+        <small>${item.desc}</small>
+      </div>
+      <button class="crm-minus" data-i="${i}" aria-label="감소">−</button>
+      <div class="crm-status"><span>${item.period}</span>${value} / ${item.target}${item.unit}</div>
+      <button class="crm-plus" data-i="${i}" aria-label="완료 체크">+</button>
+    </div>`;
+  }).join("");
+
+  wrap.querySelectorAll(".crm-minus").forEach(btn => btn.onclick = () => {
+    const idx = btn.dataset.i;
+    saved[idx] = Math.max(0, (saved[idx] || 0) - 1);
+    localStorage.setItem("r12crmChecks", JSON.stringify(saved));
+    renderCrmChecklist();
+  });
+  wrap.querySelectorAll(".crm-plus").forEach(btn => btn.onclick = () => {
+    const idx = btn.dataset.i;
+    const t = crmChecklistItems[idx].target;
+    saved[idx] = Math.min(t, (saved[idx] || 0) + 1);
+    localStorage.setItem("r12crmChecks", JSON.stringify(saved));
+    renderCrmChecklist();
+  });
+
+  let done = 0;
+  crmChecklistItems.forEach((item, i) => {
+    if((saved[i] || 0) >= item.target) done += 1;
+  });
+  const doneEl = document.getElementById("crmDoneCount");
+  if(doneEl) doneEl.textContent = done;
+}
+renderCrmChecklist();
+
+// ===== V13 real CRM input / export =====
+const escapeHtml=v=>String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const csvCell=v=>`"${String(v??"").replaceAll('"','""')}"`;
+let crmRecords=[];
+try{crmRecords=JSON.parse(localStorage.getItem("r12CrmRecords")||"[]")}catch(e){crmRecords=[]}
+if(!crmRecords.length)crmRecords=[
+  {name:"김고객",type:"소비자",phone:"010-0000-0000",stage:"상담",referrer:"권세온",sponsor:"권세온",product:"퍼펙트바디",next:"",memo:"제품 상담 예정"},
+  {name:"이사업자",type:"사업자",phone:"010-1111-2222",stage:"후속관리",referrer:"권세온",sponsor:"권세온",product:"REVERSE 12",next:"",memo:"교육자료 전달"}
+];
+function saveCrmRecords(){localStorage.setItem("r12CrmRecords",JSON.stringify(crmRecords))}
+function crmFormData(){return{name:$("#crmName").value.trim(),type:$("#crmType").value,phone:$("#crmPhone").value.trim(),stage:$("#crmStage").value,referrer:$("#crmReferrer").value.trim(),sponsor:$("#crmSponsor").value.trim(),product:$("#crmProduct").value.trim(),next:$("#crmNext").value,memo:$("#crmMemo").value.trim()}}
+function renderCrmRecords(){
+  $("#crmRows").innerHTML=crmRecords.map((r,i)=>`<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.type)}</td><td><a href="tel:${escapeHtml((r.phone||'').replaceAll('-',''))}">${escapeHtml(r.phone)}</a></td><td>${escapeHtml(r.stage)}</td><td>${escapeHtml(r.referrer||'-')} / ${escapeHtml(r.sponsor||'-')}</td><td>${escapeHtml(r.product||'-')}</td><td>${escapeHtml(r.next||'-')}</td><td><button data-crm-edit="${i}">수정</button> <button data-crm-del="${i}">삭제</button></td></tr>`).join("");
+  $("#crmTotal").textContent=crmRecords.length;$("#crmConsult").textContent=crmRecords.filter(r=>["신규","상담"].includes(r.stage)).length;$("#crmRepeat").textContent=crmRecords.filter(r=>r.stage==="재구매 예정").length;$("#crmBusiness").textContent=crmRecords.filter(r=>r.type==="사업자").length;
+  $$('[data-crm-del]').forEach(b=>b.onclick=()=>{if(confirm("이 고객 기록을 삭제하시겠습니까?")){crmRecords.splice(+b.dataset.crmDel,1);saveCrmRecords();renderCrmRecords()}});
+  $$('[data-crm-edit]').forEach(b=>b.onclick=()=>{const r=crmRecords[+b.dataset.crmEdit];$("#crmName").value=r.name;$("#crmType").value=r.type;$("#crmPhone").value=r.phone;$("#crmStage").value=r.stage;$("#crmReferrer").value=r.referrer;$("#crmSponsor").value=r.sponsor;$("#crmProduct").value=r.product;$("#crmNext").value=r.next;$("#crmMemo").value=r.memo;crmRecords.splice(+b.dataset.crmEdit,1);renderCrmRecords();$("#crmName").focus()});
+}
+$("#crmSave").onclick=()=>{const r=crmFormData();if(!r.name){alert("이름을 입력하세요.");return}crmRecords.unshift(r);saveCrmRecords();renderCrmRecords();["#crmName","#crmPhone","#crmReferrer","#crmSponsor","#crmProduct","#crmMemo"].forEach(id=>$(id).value="");$("#crmStatus").textContent=`${r.name} 고객 기록을 저장했습니다.`;$("#crmStatus").classList.add("ok")};
+$("#crmExport").onclick=()=>{const heads=["이름","구분","전화번호","단계","추천인","후원인","관심제품","다음연락일","상담메모"];const rows=crmRecords.map(r=>[r.name,r.type,r.phone,r.stage,r.referrer,r.sponsor,r.product,r.next,r.memo]);const blob=new Blob(["\ufeff"+[heads,...rows].map(row=>row.map(csvCell).join(",")).join("\r\n")],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`OWNER_CRM_${new Date().toISOString().slice(0,10)}.csv`;a.click()};
+function parseCsvLine(line){const out=[];let s="",q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'&&line[i+1]==='"'){s+='"';i++}else if(c==='"')q=!q;else if(c===','&&!q){out.push(s);s=""}else s+=c}out.push(s);return out}
+$("#crmImport").onchange=e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{const lines=String(reader.result).replace(/^\ufeff/,"").split(/\r?\n/).filter(Boolean).slice(1);lines.forEach(line=>{const x=parseCsvLine(line);crmRecords.push({name:x[0]||"",type:x[1]||"소비자",phone:x[2]||"",stage:x[3]||"신규",referrer:x[4]||"",sponsor:x[5]||"",product:x[6]||"",next:x[7]||"",memo:x[8]||""})});saveCrmRecords();renderCrmRecords();$("#crmStatus").textContent=`CSV에서 ${lines.length}건을 가져왔습니다.`};reader.readAsText(f)};
+async function pickContact(){
+  if(navigator.contacts?.select){try{const c=(await navigator.contacts.select(["name","tel"],{multiple:false}))[0];if(c){$("#crmName").value=(c.name||[])[0]||"";$("#crmPhone").value=(c.tel||[])[0]||"";$("#crmStatus").textContent="연락처를 불러왔습니다."}}catch(e){}}
+  else{const name=prompt("연락처 이름");if(!name)return;$("#crmName").value=name;$("#crmPhone").value=prompt("전화번호")||"";$("#crmStatus").textContent="이 브라우저는 연락처 선택을 지원하지 않아 직접 입력했습니다."}
+}
+$("#crmContactImport").onclick=pickContact;$("#contactSyncBtn").onclick=pickContact;$("#drawerContacts").onclick=()=>{pickContact();$("#drawer").classList.remove("open")};renderCrmRecords();
+
+// ===== Smart PDF/form center =====
+let currentFormType="회원신청서";$("#formDate").value=new Date().toISOString().slice(0,10);
+$$("#formTabs button").forEach(b=>b.onclick=()=>{$$("#formTabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");currentFormType=b.dataset.form;renderSmartForm()});
+function renderSmartForm(){const values={name:$("#formName").value,no:$("#formMemberNo").value,phone:$("#formPhone").value,address:$("#formAddress").value,ref:$("#formReferrer").value,sponsor:$("#formSponsor").value,detail:$("#formDetail").value,date:$("#formDate").value,sign:$("#formSignature").value};$("#formPreview").innerHTML=`<h2>OWNER ${escapeHtml(currentFormType)}</h2><p style="text-align:right">신청일: ${escapeHtml(values.date)}</p><table><tr><th>신청인</th><td>${escapeHtml(values.name)}</td><th>회원번호</th><td>${escapeHtml(values.no)}</td></tr><tr><th>휴대전화</th><td colspan="3">${escapeHtml(values.phone)}</td></tr><tr><th>주소</th><td colspan="3">${escapeHtml(values.address)}</td></tr><tr><th>추천인</th><td>${escapeHtml(values.ref)}</td><th>후원인</th><td>${escapeHtml(values.sponsor)}</td></tr><tr><th>신청·주문·변경 내용</th><td colspan="3" style="height:160px;vertical-align:top;white-space:pre-wrap">${escapeHtml(values.detail)}</td></tr><tr><th>전자서명</th><td colspan="3" style="text-align:right;height:70px">신청인: ${escapeHtml(values.sign||values.name)} (서명)</td></tr></table><p style="margin-top:28px;text-align:center">OWNER REVERSE 12 · 본사 콜센터 1522-6852</p>`;$("#pdfViewer").hidden=true;$("#formPreview").hidden=false;localStorage.setItem("r12LastForm",JSON.stringify({type:currentFormType,...values}))}
+$("#applyForm").onclick=renderSmartForm;
+$("#sourcePdf").onchange=e=>{const f=e.target.files[0];if(!f)return;$("#formPreview").hidden=true;$("#pdfViewer").hidden=false;$("#pdfViewer").innerHTML=`<iframe title="원본 PDF 미리보기" src="${URL.createObjectURL(f)}"></iframe>`};
+function printableForm(){renderSmartForm();return `<!doctype html><meta charset="utf-8"><title>${escapeHtml(currentFormType)}</title><style>body{font-family:Arial,'Noto Sans KR',sans-serif;padding:32px;color:#111}h2{text-align:center}table{width:100%;border-collapse:collapse}th,td{border:1px solid #777;padding:10px;font-size:13px}th{width:18%;background:#eee}@page{size:A4;margin:16mm}</style>${$("#formPreview").innerHTML}`}
+$("#printForm").onclick=()=>{const w=open("","_blank");w.document.write(printableForm());w.document.close();setTimeout(()=>w.print(),250)};
+$("#downloadForm").onclick=()=>{const blob=new Blob([printableForm()],{type:"text/html;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`OWNER_${currentFormType}_${$("#formName").value||"작성본"}.html`;a.click()};
+
+// ===== Promotion / link / song maker =====
+function promoText(){return `${$("#promoTitle").value}\n\n${$("#promoMessage").value}\n\n대상: ${$("#promoAudience").value}\nOWNER REVERSE 12\n본사 콜센터 1522-6852\nhttps://www.ownerbiz.com/`}
+$("#makePromo").onclick=()=>{$("#promoPreview").innerHTML=`${escapeHtml($("#promoTitle").value)}<br><small>${escapeHtml($("#promoMessage").value)}</small>`};
+$("#sharePromo").onclick=async()=>{const text=promoText();if(navigator.share)await navigator.share({title:$("#promoTitle").value,text});else{await navigator.clipboard.writeText(text);alert("홍보문을 복사했습니다.")}};
+$("#downloadPromoText").onclick=()=>downloadTextFile("OWNER_홍보문.txt",promoText());
+function shareLinkText(){return `${$("#linkCustomer").value||"고객"}님께 안내드립니다.\n[${$("#linkType").value}]\n${$("#linkContent").value}\n${$("#linkUrl").value}\nOWNER REVERSE 12 · 1522-6852`}
+$("#makeShareLink").onclick=()=>$("#shareLinkOutput").value=shareLinkText();
+$("#copyShareLink").onclick=async()=>{if(!$("#shareLinkOutput").value)$("#makeShareLink").click();await navigator.clipboard.writeText($("#shareLinkOutput").value);alert("공유문을 복사했습니다.")};
+$("#sendShareLink").onclick=async()=>{if(!$("#shareLinkOutput").value)$("#makeShareLink").click();const text=$("#shareLinkOutput").value;if(navigator.share)await navigator.share({title:"OWNER 고객 안내",text});else location.href=`sms:?body=${encodeURIComponent(text)}`};
+function downloadTextFile(name,text){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));a.download=name;a.click()}
+$("#makeSong").onclick=()=>{const title=$("#songTitle").value,theme=$("#songTheme").value,names=$("#songNames").value||"우리 모두",style=$("#songStyle").value;$("#songOutput").textContent=`〈${title}〉\n스타일: ${style}\n\n[Verse 1]\n오늘도 한 걸음, 꿈을 향해 가는 길\n작은 약속 하나가 큰 내일을 만들지\n${theme}, 마음속 빛을 모아\n${names} 함께라면 다시 시작할 수 있어\n\n[Chorus]\n열두 걸음 이어가, 우리의 시간을 바꿔\n건강과 성공, 자유와 나눔을 품고\nREVERSE 12, 오늘의 내가 미래를 열어\n꿈을 잇는 OWNER, 끝까지 함께 가자\n\n[Bridge]\n숫자보다 소중한 사람과 신뢰\n배우고 나누며 더 큰 리더가 되어\n\n[Final Chorus]\n열두 걸음 이어가, 오늘의 선택을 믿어\n꿈을 향한 우리의 이야기는 계속돼`};
+$("#downloadLyrics").onclick=()=>downloadTextFile(`${$("#songTitle").value||"OWNER_노래"}_가사.txt`,$("#songOutput").textContent);
+$("#playMelody").onclick=()=>{const AC=window.AudioContext||window.webkitAudioContext;if(!AC){alert("이 기기는 멜로디 재생을 지원하지 않습니다.");return}const ac=new AC(),notes=[261.63,329.63,392,523.25,440,392,329.63,261.63];notes.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type="triangle";o.frequency.value=f;g.gain.setValueAtTime(.0001,ac.currentTime+i*.35);g.gain.exponentialRampToValueAtTime(.12,ac.currentTime+i*.35+.03);g.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+i*.35+.31);o.connect(g).connect(ac.destination);o.start(ac.currentTime+i*.35);o.stop(ac.currentTime+i*.35+.33)})};
+
+// ===== Photo-to-video studio (canvas + MediaRecorder) =====
+let videoImages=[],previewTimer=null,activeRecorder=null,videoAbort=false;
+function fileToImage(file){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=URL.createObjectURL(file)})}
+$("#videoPhotos").onchange=async e=>{videoImages=await Promise.all([...e.target.files].map(fileToImage));$("#videoStatus").textContent=`사진 ${videoImages.length}장을 불러왔습니다.`;drawVideoFrame(videoImages[0],0)};
+function drawVideoFrame(img,progress){const c=$("#videoCanvas"),ctx=c.getContext("2d"),w=c.width,h=c.height;ctx.fillStyle="#03070c";ctx.fillRect(0,0,w,h);if(img){const s=Math.max(w/img.width,h/img.height),iw=img.width*s,ih=img.height*s;ctx.drawImage(img,(w-iw)/2,(h-ih)/2,iw,ih);ctx.fillStyle="rgba(0,0,0,.38)";ctx.fillRect(0,0,w,h)}else{const g=ctx.createLinearGradient(0,0,w,h);g.addColorStop(0,"#10243f");g.addColorStop(1,"#02060a");ctx.fillStyle=g;ctx.fillRect(0,0,w,h)}ctx.fillStyle="#e9d59f";ctx.font="700 56px sans-serif";ctx.fillText($("#videoTitle").value||"OWNER REVERSE 12",70,h-150);ctx.fillStyle="#fff";ctx.font="30px sans-serif";const line=($("#videoScript").value||"").split(/[.!?\n]/).filter(Boolean)[Math.floor(progress*6)%Math.max(1,($("#videoScript").value||"").split(/[.!?\n]/).filter(Boolean).length)]||"오늘의 관리가 미래를 만듭니다";ctx.fillText(line.trim().slice(0,52),70,h-90);ctx.fillStyle="#d3b56c";ctx.fillRect(70,h-50,(w-140)*progress,6)}
+$("#previewVideo").onclick=()=>{clearInterval(previewTimer);if(!videoImages.length){const img=new Image();img.onload=()=>{videoImages=[img];startPreview()};img.src="https://owner-reverse12.kwonkiil.chatgpt.site/upload/04-1000131311.png"}else startPreview()};
+function startPreview(){let i=0;drawVideoFrame(videoImages[0],0);previewTimer=setInterval(()=>{i++;drawVideoFrame(videoImages[i%videoImages.length],(i%20)/20)},1800);$("#videoStatus").textContent="슬라이드 미리보기 재생 중"}
+$("#exportVideo").onclick=async()=>{if(!window.MediaRecorder||!$("#videoCanvas").captureStream){alert("이 브라우저는 영상 내보내기를 지원하지 않습니다. Chrome에서 실행해 주세요.");return}if(!videoImages.length){alert("영상에 사용할 사진을 먼저 선택하세요.");return}clearInterval(previewTimer);videoAbort=false;const seconds=+$("#videoDuration").value,start=performance.now(),stream=$("#videoCanvas").captureStream(24),chunks=[];activeRecorder=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm"});activeRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};activeRecorder.onstop=()=>{if(!videoAbort){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(chunks,{type:"video/webm"}));a.download=`${$("#videoTitle").value||"OWNER_REVERSE12"}.webm`;a.click();$("#videoStatus").textContent="영상 생성이 완료되었습니다."}};activeRecorder.start(1000);function frame(now){const p=Math.min(1,(now-start)/(seconds*1000)),idx=Math.min(videoImages.length-1,Math.floor(p*videoImages.length));drawVideoFrame(videoImages[idx],p);$("#videoProgress").style.width=`${p*100}%`;$("#videoStatus").textContent=`영상 생성 중 ${Math.round(p*100)}% · 화면을 닫지 마세요.`;if(p<1&&!videoAbort)requestAnimationFrame(frame);else if(activeRecorder?.state!=="inactive")activeRecorder.stop()}requestAnimationFrame(frame)};
+$("#stopVideo").onclick=()=>{videoAbort=true;clearInterval(previewTimer);if(activeRecorder?.state!=="inactive")activeRecorder.stop();$("#videoStatus").textContent="영상 작업을 중지했습니다."};drawVideoFrame(null,0);
+
+// ===== Video meeting preview =====
+let localStream=null,micOn=true,cameraOn=true;
+$("#startCamera").onclick=async()=>{try{localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});$("#localVideo").srcObject=localStream;$("#localVideo").hidden=false;$("#cameraPlaceholder").hidden=true;$("#meetingStatus").textContent="카메라와 마이크가 연결되었습니다. 초대 링크를 공유할 수 있습니다.";$("#meetingStatus").classList.add("ok")}catch(e){$("#meetingStatus").textContent="카메라 권한을 허용하거나 HTTPS/Termux 로컬 서버에서 열어 주세요."}};
+$("#toggleMic").onclick=()=>{micOn=!micOn;localStream?.getAudioTracks().forEach(t=>t.enabled=micOn);$("#toggleMic").textContent=micOn?"마이크":"마이크 꺼짐"};
+$("#toggleCamera").onclick=()=>{cameraOn=!cameraOn;localStream?.getVideoTracks().forEach(t=>t.enabled=cameraOn);$("#toggleCamera").textContent=cameraOn?"화면 끄기":"화면 켜기"};
+$("#endMeeting").onclick=()=>{localStream?.getTracks().forEach(t=>t.stop());localStream=null;$("#localVideo").hidden=true;$("#cameraPlaceholder").hidden=false;$("#meetingStatus").textContent="화상회의를 종료했습니다."};
+$("#addParticipant").onclick=()=>alert("정식 서버 연결 후 참가자 계정 검색·초대·입장 승인 기능으로 확장됩니다.");
+$("#inviteMeeting").onclick=async()=>{const text=`OWNER REVERSE 12 화상회의 초대\n${location.href.split('#')[0]}#meeting`;if(navigator.share)await navigator.share({title:"OWNER 화상회의 초대",text,url:location.href.split('#')[0]+"#meeting"});else{await navigator.clipboard.writeText(text);alert("화상회의 초대 링크를 복사했습니다.")}};
+
+// ===== Compensation / performance =====
+function updatePerformance(){const p=+$("#personalPV").value||0,g=+$("#groupPV").value||0,d=+$("#directCount").value||0,r=+$("#rewardAmount").value||0;$("#personalPVLabel").textContent=p.toLocaleString();$("#groupPVLabel").textContent=g.toLocaleString();$("#directCountLabel").textContent=d;$("#rewardLabel").textContent=r.toLocaleString();$("#personalPVBar").style.width=Math.min(100,p/10)+"%";$("#groupPVBar").style.width=Math.min(100,g/50)+"%";$("#directCountBar").style.width=Math.min(100,d*20)+"%";$("#rewardBar").style.width=Math.min(100,r/10000)+"%"}
+const perfIds=["personalPV","groupPV","directCount","rewardAmount","rankGoal","rankDate"];try{const savedPerf=JSON.parse(localStorage.getItem("r12Performance")||"null");if(savedPerf)perfIds.forEach(id=>{if(savedPerf[id]!=null)$("#"+id).value=savedPerf[id]})}catch(e){}perfIds.forEach(id=>$("#"+id).oninput=updatePerformance);$("#savePerformance").onclick=()=>{const data={};perfIds.forEach(id=>data[id]=$("#"+id).value);localStorage.setItem("r12Performance",JSON.stringify(data));updatePerformance();alert("실적과 목표를 저장했습니다.")};updatePerformance();
+
+// ===== AI daily assistant / leadership =====
+function buildBrief(){const goal=$("#todayGoal").value||"오늘의 핵심 목표를 먼저 입력하세요";const done=$$("#routineList input:checked").length;const crmDue=crmRecords.filter(r=>!r.next||r.next<=new Date().toISOString().slice(0,10)).slice(0,3);$("#briefList").innerHTML=`<li><b>핵심 목표:</b> ${escapeHtml(goal)}</li><li><b>12가지 관리:</b> ${done}/12 완료 — 다음 미완료 항목부터 실행하세요.</li><li><b>고객관리:</b> ${crmDue.length?crmDue.map(r=>escapeHtml(r.name)).join(", ")+" 후속 연락 확인":"오늘 예정된 후속 연락이 없습니다."}</li><li><b>콘텐츠:</b> 홍보물 또는 30초 영상 시안 1개를 완성하세요.</li><li><b>리더십:</b> 파트너 한 명에게 질문하고 경청한 내용을 기록하세요.</li>`;return $("#briefList").innerText}
+$("#refreshBrief").onclick=buildBrief;$("#speakBrief").onclick=()=>{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(buildBrief());u.lang="ko-KR";speechSynthesis.speak(u)};$("#shareBrief").onclick=async()=>{const text=`${$("#briefTitle").textContent}\n${buildBrief()}`;if(navigator.share)await navigator.share({title:"OWNER 오늘 브리핑",text});else navigator.clipboard.writeText(text)};buildBrief();
+const leadershipTasks=[
+  ["비전 전달","팀원이 자신의 꿈을 말하도록 질문하고 기록",20],
+  ["경청과 코칭","답을 주기 전에 질문 3개로 스스로 해답을 찾게 돕기",20],
+  ["제품·사업 교육","10분 이내로 단순하고 정확하게 설명하는 연습",15],
+  ["신뢰와 윤리","과장 없이 사실과 개인 경험을 구분해 전달",15],
+  ["복제 가능한 행동","신규 파트너가 오늘 바로 따라 할 행동 3개 제공",15],
+  ["성과 리뷰와 인정","숫자를 점검하고 작은 실행을 공개적으로 인정",15]
+];
+function renderLeadership(){const saved=JSON.parse(localStorage.getItem("r12Leadership")||"{}");$("#leadershipList").innerHTML=leadershipTasks.map((t,i)=>`<label class="leadership-item"><input type="checkbox" data-lead="${i}" ${saved[i]?'checked':''}><div><b>${i+1}. ${t[0]}</b><small>${t[1]}</small></div><span>${t[2]}분</span></label>`).join("");$$('[data-lead]').forEach(x=>x.onchange=()=>{saved[x.dataset.lead]=x.checked;localStorage.setItem("r12Leadership",JSON.stringify(saved));$("#leadershipDone").textContent=$$('[data-lead]:checked').length});$("#leadershipDone").textContent=$$('[data-lead]:checked').length}renderLeadership();
+
+// ===== Six-language core navigation =====
+const i18n={
+ en:{"홈":"Home","오늘":"Today","고객":"CRM","채팅":"Chat","자료":"Files","12가지 관리지침":"12 Success Principles","일일 자기관리":"Daily Management","사업자/소비자 CRM":"Business & Customer CRM","오너 고객 채팅센터":"Owner Chat Center","1:1·다자간 화상회의":"1:1 & Group Video","AI 문구·영상 작업실":"AI Content Studio","자료실":"Data Room","신청서·주문서 PDF 작성":"Forms & PDF","홍보물 만들기":"Promotion Maker","2~3분 홍보영상 만들기":"2–3 min Video Maker","노래 만들기":"Song Maker","고객관리 링크 만들기":"CRM Share Link","보상플랜·실적 관리":"Compensation & Performance","AI 일일관리 비서":"AI Daily Assistant","12년 성장 공식·리더십 교육":"12-Year Growth & Leadership"},
+ ja:{"홈":"ホーム","오늘":"今日","고객":"顧客管理","채팅":"チャット","자료":"資料","12가지 관리지침":"12の成功管理指針","일일 자기관리":"日々の自己管理","사업자/소비자 CRM":"事業者・顧客CRM","오너 고객 채팅센터":"オーナーチャット","1:1·다자간 화상회의":"1対1・グループ会議","홍보물 만들기":"広報物作成","2~3분 홍보영상 만들기":"2～3分動画作成","노래 만들기":"歌を作る","보상플랜·실적 관리":"報酬・実績管理"},
+ zh:{"홈":"首页","오늘":"今日","고객":"客户","채팅":"聊天","자료":"资料","12가지 관리지침":"12项成功管理指南","일일 자기관리":"每日自我管理","사업자/소비자 CRM":"事业伙伴与客户CRM","오너 고객 채팅센터":"OWNER聊天中心","1:1·다자간 화상회의":"一对一及多人视频会议","홍보물 만들기":"制作宣传资料","2~3분 홍보영상 만들기":"制作2–3分钟视频","노래 만들기":"创作歌曲","보상플랜·실적 관리":"奖励与业绩管理"},
+ vi:{"홈":"Trang chủ","오늘":"Hôm nay","고객":"Khách hàng","채팅":"Trò chuyện","자료":"Tài liệu","12가지 관리지침":"12 nguyên tắc thành công","일일 자기관리":"Quản lý hằng ngày","사업자/소비자 CRM":"CRM đối tác và khách hàng","오너 고객 채팅센터":"Trung tâm trò chuyện OWNER","1:1·다자간 화상회의":"Họp video cá nhân và nhóm","홍보물 만들기":"Tạo nội dung quảng bá","2~3분 홍보영상 만들기":"Tạo video 2–3 phút","노래 만들기":"Tạo bài hát","보상플랜·실적 관리":"Thưởng và hiệu suất"},
+ th:{"홈":"หน้าแรก","오늘":"วันนี้","고객":"ลูกค้า","채팅":"แชต","자료":"เอกสาร","12가지 관리지침":"หลักความสำเร็จ 12 ข้อ","일일 자기관리":"การจัดการประจำวัน","사업자/소비자 CRM":"CRM ธุรกิจและลูกค้า","오너 고객 채팅센터":"ศูนย์แชต OWNER","1:1·다자간 화상회의":"วิดีโอคอลเดี่ยวและกลุ่ม","홍보물 만들기":"สร้างสื่อประชาสัมพันธ์","2~3분 홍보영상 만들기":"สร้างวิดีโอ 2–3 นาที","노래 만들기":"สร้างเพลง","보상플랜·실적 관리":"ค่าตอบแทนและผลงาน"}
+};
+Object.assign(i18n.en,{"일일 자기관리모드":"Daily Self-Management","사업자 · 소비자 관리":"Business & Customer CRM","신청서 작성 · PDF 저장 · 내보내기":"Forms · PDF Export","조직도 · 추천인/후원인 관리":"Organization & Sponsor Tree","본인 명함 수정 · PNG 내보내기":"Business Card Editor · PNG Export","고객 맞춤 인사말 · 문구 작성":"Personalized Message Maker","사진·자료로 2~3분 홍보영상 만들기":"2–3 Minute Promo Video Studio","노래 만들기 · 가사 · 멜로디 시안":"Song · Lyrics · Melody Draft","고객관리 내용 링크·공유문 만들기":"CRM Link & Share Message","화상회의실 · 1:1 및 다자간":"1:1 & Group Video Meeting","보상플랜 · 실적 관리":"Compensation & Performance","12년 빠른 성장 시스템 · 12가지 공식":"12-Year Growth System · 12 Formulas","명함 기준 · 미래형 앱 · 고급 모델 이미지":"Premium Card · Future App · Models","오시는 길":"Directions"});
+Object.assign(i18n.ja,{"일일 자기관리모드":"日々の自己管理","사업자 · 소비자 관리":"事業者・顧客CRM","신청서 작성 · PDF 저장 · 내보내기":"申請書・PDF保存","조직도 · 추천인/후원인 관리":"組織図・推薦者管理","본인 명함 수정 · PNG 내보내기":"名刺編集・PNG出力","고객 맞춤 인사말 · 문구 작성":"顧客別メッセージ作成","사진·자료로 2~3분 홍보영상 만들기":"写真で2～3分の広報動画作成","노래 만들기 · 가사 · 멜로디 시안":"歌・歌詞・メロディ案","고객관리 내용 링크·공유문 만들기":"CRM共有リンク作成","화상회의실 · 1:1 및 다자간":"1対1・グループビデオ会議","보상플랜 · 실적 관리":"報酬プラン・実績管理","12년 빠른 성장 시스템 · 12가지 공식":"12年成長システム・12公式","오시는 길":"アクセス"});
+Object.assign(i18n.zh,{"일일 자기관리모드":"每日自我管理","사업자 · 소비자 관리":"事业伙伴与客户CRM","신청서 작성 · PDF 저장 · 내보내기":"填写申请表·导出PDF","조직도 · 추천인/후원인 관리":"组织图·推荐人与赞助人","본인 명함 수정 · PNG 내보내기":"编辑名片·导出PNG","고객 맞춤 인사말 · 문구 작성":"客户个性化信息","사진·자료로 2~3분 홍보영상 만들기":"用照片制作2–3分钟宣传视频","노래 만들기 · 가사 · 멜로디 시안":"歌曲·歌词·旋律草案","고객관리 내용 링크·공유문 만들기":"CRM分享链接","화상회의실 · 1:1 및 다자간":"一对一与多人视频会议","보상플랜 · 실적 관리":"奖励计划与业绩","12년 빠른 성장 시스템 · 12가지 공식":"12年快速成长系统·12公式","오시는 길":"路线"});
+Object.assign(i18n.vi,{"일일 자기관리모드":"Tự quản lý hằng ngày","사업자 · 소비자 관리":"CRM đối tác và khách hàng","신청서 작성 · PDF 저장 · 내보내기":"Biểu mẫu · Xuất PDF","조직도 · 추천인/후원인 관리":"Sơ đồ tổ chức · Người giới thiệu","본인 명함 수정 · PNG 내보내기":"Sửa danh thiếp · Xuất PNG","고객 맞춤 인사말 · 문구 작성":"Tin nhắn cá nhân hóa","사진·자료로 2~3분 홍보영상 만들기":"Tạo video quảng bá 2–3 phút","노래 만들기 · 가사 · 멜로디 시안":"Bài hát · Lời · Giai điệu","고객관리 내용 링크·공유문 만들기":"Liên kết chia sẻ CRM","화상회의실 · 1:1 및 다자간":"Họp video cá nhân và nhóm","보상플랜 · 실적 관리":"Thưởng và hiệu suất","12년 빠른 성장 시스템 · 12가지 공식":"Hệ thống tăng trưởng 12 năm","오시는 길":"Chỉ đường"});
+Object.assign(i18n.th,{"일일 자기관리모드":"การจัดการตนเองประจำวัน","사업자 · 소비자 관리":"CRM ธุรกิจและลูกค้า","신청서 작성 · PDF 저장 · 내보내기":"แบบฟอร์ม · ส่งออก PDF","조직도 · 추천인/후원인 관리":"แผนผังองค์กร · ผู้แนะนำ","본인 명함 수정 · PNG 내보내기":"แก้นามบัตร · ส่งออก PNG","고객 맞춤 인사말 · 문구 작성":"ข้อความเฉพาะบุคคล","사진·자료로 2~3분 홍보영상 만들기":"สร้างวิดีโอประชาสัมพันธ์ 2–3 นาที","노래 만들기 · 가사 · 멜로디 시안":"เพลง · เนื้อร้อง · ทำนอง","고객관리 내용 링크·공유문 만들기":"ลิงก์แชร์ CRM","화상회의실 · 1:1 및 다자간":"ประชุมวิดีโอเดี่ยวและกลุ่ม","보상플랜 · 실적 관리":"ค่าตอบแทนและผลงาน","12년 빠른 성장 시스템 · 12가지 공식":"ระบบเติบโต 12 ปี","오시는 길":"เส้นทาง"});
+const translatable=()=>[...document.querySelectorAll(".bottom button,.drawer-card button,.quick .tile span,.creator-actions button,.section-head h3,.section-head h4")];translatable().forEach(el=>el.dataset.ko=el.textContent.trim());function applyLanguage(lang){translatable().forEach(el=>{const ko=el.dataset.ko;el.textContent=lang==="ko"?ko:(i18n[lang]?.[ko]||ko)});document.documentElement.lang=lang;localStorage.setItem("r12Lang",lang)}$("#langSelect").value=localStorage.getItem("r12Lang")||"ko";$("#langSelect").onchange=e=>applyLanguage(e.target.value);applyLanguage($("#langSelect").value);
+
+</script>
+
+<div id="localOpenNotice" style="display:none;position:fixed;left:10px;right:10px;bottom:88px;z-index:9999;
+background:#101827;color:white;border:1px solid #31425c;border-radius:14px;padding:12px 14px;
+font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.35)">
+이 파일은 단일 HTML 버전이라 직접 열어도 디자인이 유지됩니다. 일부 공유/다운로드 기능은
+Termux에서 http://127.0.0.1:8080 으로 열면 더 안정적입니다.
+<button onclick="this.parentElement.remove()" style="float:right;background:#fff;color:#111;border:0;border-radius:8px;padding:5px 8px">확인</button>
+</div>
+<script>
+try{
+  if(location.protocol==='file:' || location.protocol==='content:'){
+    document.addEventListener('DOMContentLoaded',()=>{const n=document.getElementById('localOpenNotice'); if(n)n.style.display='block';});
+  }
+}catch(e){}
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+  const restore = document.getElementById("restorePlaySub");
+  const manage = document.getElementById("managePlaySub");
+  if(restore) restore.onclick = function(){
+    if(window.AndroidBilling && window.AndroidBilling.restore) window.AndroidBilling.restore();
+    else alert("구매 복원은 Google Play 설치 앱에서 실행됩니다.");
+  };
+  if(manage) manage.onclick = function(){
+    if(window.AndroidBilling && window.AndroidBilling.manage) window.AndroidBilling.manage();
+    else window.open("https://play.google.com/store/account/subscriptions","_blank");
+  };
+});
+</script>
+
+
+<div class="zoom-help" id="pageZoomControls">
+  <button id="pageZoomOut" aria-label="축소">−</button>
+  <span id="pageZoomLabel">100%</span>
+  <button id="pageZoomIn" aria-label="확대">＋</button>
+</div>
+<script>
+(function(){
+  let z=1;
+  const out=document.getElementById('pageZoomOut');
+  const inn=document.getElementById('pageZoomIn');
+  const label=document.getElementById('pageZoomLabel');
+  function apply(){
+    z=Math.max(.75,Math.min(1.5,z));
+    document.documentElement.style.fontSize=(16*z)+'px';
+    label.textContent=Math.round(z*100)+'%';
+  }
+  out.addEventListener('click',()=>{z-=.1;apply();});
+  inn.addEventListener('click',()=>{z+=.1;apply();});
+  apply();
+})();
+</script>
+
+
+  <div id="r12ZoomOverlay" aria-hidden="true"><button id="r12ZoomClose" aria-label="닫기">×</button><div id="r12ZoomStage"><div id="r12ZoomContent"></div></div><div class="r12g-zoom-hint">두 손가락 확대·축소 · 한 손가락 이동 · 두 번 터치 원위치</div></div>
+
+
+<script id="r12-v20-corrected-js">
+(()=>{
+'use strict';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+// 1) Keep the embedded AI Studio page seamless — no second scroll bar.
+const frame=$('#r12ScheduleFrame');
+function fitStudio(){
+  if(!frame) return;
+  try{
+    const d=frame.contentDocument;
+    if(!d) return;
+    d.documentElement.style.overflow='hidden'; d.body.style.overflow='hidden';
+    const h=Math.max(d.documentElement.scrollHeight,d.body.scrollHeight,900);
+    frame.style.height=(h+4)+'px';
+  }catch(e){}
+}
+if(frame){frame.addEventListener('load',()=>{fitStudio();[200,700,1600,3000].forEach(t=>setTimeout(fitStudio,t));});}
+
+// 2) Product source priority: current OWNER app storage -> globals -> existing DOM -> backed-up OWNER sample.
+const fallback=[
+ ['cream','뷰티제품',0,'세노이드 네오 다이아크림',99000,'SENOID'],
+ ['essence','뷰티제품',1,'세노이드 다이아 퍼밍 에센스',67500,'SENOID'],
+ ['mist','뷰티제품',2,'세노이드 루미너스 샤인 미스트',64500,'SENOID'],
+ ['exonia','뷰티제품',3,'엑소니아 33앰플',550000,'EXONIA 33'],
+ ['airjet','뷰티제품',4,'코스메틱 에어젯',273000,'Cosmetic Airjet'],
+ ['dfh901','풋헬스',5,'닥터풋헬스 메디칼',140000,'DFH901'],
+ ['dfh803','풋헬스',6,'닥터풋헬스 액티런',70000,'DFH803'],
+ ['dugeuni','생활제품',7,'두근이',1680000,'DUGEUNI'],
+ ['hairon','생활제품',8,'헤어온',660000,'HAIRON'],
+ ['secret','생활제품',9,'시크릿 파워(온열)',1920000,'SECRET POWER'],
+ ['dfh701','풋헬스',10,'닥터풋헬스 트라이앵글',0,'DFH701'],
+ ['dfh702','풋헬스',11,'닥터풋헬스 서포터',0,'DFH702'],
+ ['dfh703','풋헬스',12,'닥터풋헬스 컴포터',0,'DFH703'],
+ ['dfh801','풋헬스',13,'닥터풋헬스 액티브',0,'DFH801'],
+ ['dfh802','풋헬스',14,'닥터풋헬스 다이나믹',0,'DFH802'],
+ ['dfh902','풋헬스',17,'닥터풋헬스 오소틱',0,'DFH902'],
+ ['dfh903','풋헬스',18,'닥터풋헬스 메디워크',0,'DFH903']
+].map(x=>({id:'backup_'+x[0],category:x[1],photo:x[2],name:x[3],price:x[4],sku:x[5],desc:'주식회사 오너 등록 제품 · 상세 이미지는 터치하여 확대'}));
+function pname(p){if(typeof p?.name==='string')return p.name;if(p?.name&&typeof p.name==='object')return p.name.ko||p.name.en||Object.values(p.name)[0]||'제품';return p?.title||p?.productName||p?.label||'제품'}
+function pimage(p){return p?.image||p?.imageUrl||p?.photoData||p?.photoUrl||p?.src||p?.thumbnail||''}
+function pprice(p){const v=p?.consumerPrice??p?.retail??p?.price??p?.memberPrice??p?.member;return Number(String(v??'').replace(/[^0-9.-]/g,''))||0}
+function norm(p,i){return {id:String(p?.id||p?.sku||p?.code||('owner_'+i)),name:pname(p),category:p?.category||p?.group||p?.type||'제품',sku:p?.sku||p?.model||p?.code||'OWNER',price:pprice(p),image:pimage(p),photo:Number.isFinite(Number(p?.photo))?Number(p.photo):null,desc:p?.desc||p?.description||p?.memo||'주식회사 오너 등록 제품 · 사진 터치 확대',active:p?.active!==false}}
+function storageProducts(){for(const k of ['r12AdminProducts','ownerProducts','reverse12Products','products','r12Products']){try{const a=JSON.parse(localStorage.getItem(k)||'[]');if(Array.isArray(a)&&a.length)return a.map(norm).filter(x=>x.active)}catch(e){}}return []}
+function globalProducts(){for(const a of [window.r12AdminProducts,window.ownerProducts,window.reverse12Products,window.products,window.OWNER_STORE?.products]){if(Array.isArray(a)&&a.length)return a.map(norm).filter(x=>x.active)}return []}
+function domProducts(){
+ const sels=['[data-product-id]','.shop-product','.product-card','.product-item','.owner-product'];
+ const rows=[]; const seen=new Set();
+ $$(sels.join(',')).forEach((el,i)=>{const img=el.querySelector('img'),txt=(el.innerText||'').trim().split('\n').map(x=>x.trim()).filter(Boolean);const name=el.dataset.productName||el.querySelector('[data-product-name]')?.textContent||el.querySelector('h3,h4,b,strong')?.textContent||txt[0];if(!name||seen.has(name))return;seen.add(name);const priceText=el.querySelector('[data-price],.price,strong')?.textContent||txt.find(x=>/원/.test(x))||'';rows.push(norm({id:el.dataset.productId||'dom_'+i,name,category:el.dataset.category||'제품',image:img?.src||'',price:priceText,desc:txt.slice(1,4).join(' · ')},i))});return rows
+}
+let all=storageProducts(); if(!all.length)all=globalProducts(); if(!all.length)all=domProducts(); if(!all.length)all=fallback;
+all=all.filter((p,i,a)=>p.name&&a.findIndex(q=>q.name===p.name)===i);
+let category='전체', query='';
+const fmt=n=>n?new Intl.NumberFormat('ko-KR').format(n)+'원':'가격문의';
+function tileStyle(idx){const n=Number.isFinite(Number(idx))?Number(idx):0,col=((n%20)%5),row=Math.floor((n%20)/5);return `--col:${col};--row:${row}`}
+function media(p,i){if(p.image)return `<div class="r12g-media" data-zoom-image="${String(p.image).replace(/"/g,'&quot;')}"><span class="r12g-zoom-label">확대 · 축소 · 이동</span><img loading="lazy" src="${String(p.image).replace(/"/g,'&quot;')}" alt="${p.name.replace(/"/g,'&quot;')}"></div>`;const n=p.photo??i;return `<div class="r12g-media" data-zoom-sprite="${n}"><span class="r12g-zoom-label">확대 · 축소 · 이동</span><div class="r12g-sprite" style="${tileStyle(n)}"></div></div>`}
+function card(p,i){return `<article class="r12g-card">${media(p,i)}<div class="r12g-info"><small>${p.category||'제품'} · ${p.sku||'OWNER'}</small><b>${p.name}</b><strong>${fmt(p.price)}</strong><p>${p.desc||''}</p></div></article>`}
+function visible(){const q=query.trim().toLowerCase();return all.filter(p=>(category==='전체'||p.category===category)&&(!q||(p.name+' '+p.category+' '+p.sku).toLowerCase().includes(q)))}
+function renderFilters(){const box=$('#r12ProductFilters');if(!box)return;const cats=['전체',...Array.from(new Set(all.map(p=>p.category).filter(Boolean)))];box.innerHTML=cats.map(c=>`<button class="r12g-filter ${c===category?'active':''}" data-cat="${c}">${c}</button>`).join('');$$('[data-cat]',box).forEach(b=>b.onclick=()=>{category=b.dataset.cat;renderFilters();renderProducts()})}
+function renderProducts(){const arr=visible();$('#r12ProductCount').textContent=arr.length;const h=arr.map(card).join('');$('#r12ProductRail').innerHTML=h||'<div class="r12g-empty">조건에 맞는 제품이 없습니다.</div>';$('#r12ProductVertical').innerHTML=h||'<div class="r12g-empty">조건에 맞는 제품이 없습니다.</div>';bindZoom()}
+const search=$('#r12ProductSearch');if(search)search.addEventListener('input',e=>{query=e.target.value||'';renderProducts()});
+renderFilters();renderProducts();
+$$('[data-r12-jump]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.r12Jump,t=k==='rail'?$('#r12ProductRail'):k==='vertical'?$('#r12ProductVertical'):$('#customers');t?.scrollIntoView({behavior:'smooth',block:'start'})}));
+
+// 3) Pinch, wheel and drag zoom.
+const overlay=$('#r12ZoomOverlay'),stage=$('#r12ZoomStage'),content=$('#r12ZoomContent'),close=$('#r12ZoomClose');let scale=1,tx=0,ty=0,startX=0,startY=0,startTx=0,startTy=0,panning=false,startDist=0,startScale=1,lastTap=0;
+function apply(){content.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`}
+function reset(){scale=1;tx=0;ty=0;apply()}
+function openMedia(el){content.innerHTML='';const src=el.dataset.zoomImage,spr=el.dataset.zoomSprite;if(src){const im=new Image();im.src=src;im.alt='제품 확대';content.appendChild(im)}else{const d=document.createElement('div');d.className='r12g-sprite';d.setAttribute('style',tileStyle(Number(spr)||0));content.appendChild(d)}reset();overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');document.body.style.overflow='hidden'}
+function shut(){overlay.classList.remove('open');overlay.setAttribute('aria-hidden','true');document.body.style.overflow=''}
+function bindZoom(){$$('.r12g-media').forEach(el=>{el.onclick=()=>openMedia(el)})}
+close.onclick=shut;overlay.addEventListener('click',e=>{if(e.target===overlay)shut()});
+stage.addEventListener('wheel',e=>{e.preventDefault();scale=Math.min(6,Math.max(1,scale*(e.deltaY<0?1.12:.9)));if(scale===1){tx=0;ty=0}apply()},{passive:false});
+function dist(t){const a=t[0],b=t[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+stage.addEventListener('touchstart',e=>{if(e.touches.length===2){startDist=dist(e.touches);startScale=scale}else if(e.touches.length===1){const now=Date.now();if(now-lastTap<280){reset();lastTap=0;return}lastTap=now;panning=true;startX=e.touches[0].clientX;startY=e.touches[0].clientY;startTx=tx;startTy=ty}},{passive:false});
+stage.addEventListener('touchmove',e=>{e.preventDefault();if(e.touches.length===2&&startDist){scale=Math.min(6,Math.max(1,startScale*dist(e.touches)/startDist));apply()}else if(e.touches.length===1&&panning&&scale>1){tx=startTx+e.touches[0].clientX-startX;ty=startTy+e.touches[0].clientY-startY;apply()}},{passive:false});
+stage.addEventListener('touchend',()=>{panning=false;startDist=0;if(scale<=1.01)reset()});
+stage.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'){panning=true;startX=e.clientX;startY=e.clientY;startTx=tx;startTy=ty;stage.setPointerCapture?.(e.pointerId)}});stage.addEventListener('pointermove',e=>{if(panning&&e.pointerType==='mouse'&&scale>1){tx=startTx+e.clientX-startX;ty=startTy+e.clientY-startY;apply()}});stage.addEventListener('pointerup',()=>panning=false);
+
+// 4) Device/browser back: first back goes to the previous internal screen/section instead of immediately exiting.
+try{history.replaceState({r12:true,guard:0},'');history.pushState({r12:true,guard:1},'');window.addEventListener('popstate',()=>{if(window.scrollY>250){const secs=$$('main>section');let prev=secs[0];for(const s of secs){if(s.offsetTop<window.scrollY-80)prev=s;else break}prev?.scrollIntoView({behavior:'smooth',block:'start'})}else window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>history.pushState({r12:true,guard:1},''),60)})}catch(e){}
+})();
+</script>
+
+</body>
+</html>
